@@ -15,7 +15,7 @@ auto_detect()
 	sort -r /lib/modules/`uname -r`/modules.alias | \
 		sed -n 's/^alias  *\([^ ]*\)  *\(.*\)/\1)busybox modprobe \2;;/p' >> $tmp
 	echo 'esac; done; }' >> $tmp
-	
+	sed -i '/brcmfmac/d' $tmp
 	source $tmp
 	cat /sys/bus/*/devices/*/uevent | grep MODALIAS | sed 's/^MODALIAS=//' | awk '!seen[$0]++' | dev2mod
 	cat /sys/devices/virtual/wmi/*/modalias | dev2mod
