@@ -185,7 +185,9 @@ for s in `ls /scripts/* /src/scripts/*`; do
 done
 
 # ensure keyboard driver is loaded
-[ -n "$INSTALL" -o -n "$DEBUG" ] && auto_detect &
+[ -n "$INSTALL" -o -n "$DEBUG" ] && auto_detect & 
+# Do once more for redundency
+[ -n "$INSTALL" -o -n "$DEBUG" ] && busybox modprobe -a atkbd hid-apple
 
 if [ 0$DEBUG -gt 0 ]; then
 	echo -e "\nType 'exit' to continue booting...\n"
