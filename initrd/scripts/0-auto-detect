@@ -23,6 +23,22 @@ auto_detect()
 	cat /sys/devices/virtual/wmi/*/modalias | dev2mod
 }
 
+find_network_dev_name()
+{
+        echo "in find network dev name"
+        DHCPCD="/system/bin/dhcpcd -o domain_name_servers"
+  	rmline=`grep -n "#REMOVE FROM HERE" init.rc|cut -d':' -f1`
+  	rmline=`expr $rmline + 1`
+  	sed -i -e "$rmline,\$d" init.rc
+  	for netdev in `ls /sys/class/net`; do
+                echo "net device: $netdev"
+    		if [ "$netdev" != "lo" -a "$netdev" != "wmaster0" ]; then
+      			echo -e "service dhcpcd_$netdev $DHCPCD -ABKL\n   disabled\n   oneshot\n" >> init.rc
+      			echo -e "service iprenew_$netdev $DHCPCD -n\n   disabled\n   oneshot\n" >> init.rc
+    		fi
+  	done
+}
+
 load_modules()
 {
 	if [ "$AUTO_LOAD" = "old" ]; then
@@ -33,4 +49,6 @@ load_modules()
 	for m in $EXTMOD; do
 		busybox modprobe $m
 	done
+	
+	find_network_dev_name
 }
