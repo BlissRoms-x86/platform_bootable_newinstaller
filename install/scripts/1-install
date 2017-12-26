@@ -171,6 +171,7 @@ create_menulst()
 	echo -e "${GRUB_OPTIONS:-default=0\ntimeout=6\nsplashimage=/grub/android-x86.xpm.gz\n}root (hd0,$1)\n" > $menulst
 
 	create_entry "Android-x86 $VER" quiet $cmdline
+	create_entry "Android-x86 $VER (old modprobe)" quiet AUTO_LOAD=old $cmdline
 	create_entry "Android-x86 $VER (No SetupWizard)" quiet SETUPWIZARD=0 $cmdline
 	create_entry "Android-x86 $VER (Debug mode)" DEBUG=2 $cmdline
 	create_entry "Android-x86 $VER (Debug mode no hwaccel)" DEBUG=2 HWACCEL=0 $cmdline
