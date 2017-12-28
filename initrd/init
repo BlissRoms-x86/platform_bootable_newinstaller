@@ -135,20 +135,30 @@ debug_shell()
 	fi
 }
 
-echo -n Detecting Android-x86...
+echo -n Detecting Bliss-OS-x86...
+
+
+echo "Boot image: $BOOT_IMAGE"
+echo "Src: $SRC"
 
 [ -z "$SRC" -a -n "$BOOT_IMAGE" ] && SRC=`dirname $BOOT_IMAGE`
 [ -z "$RAMDISK" ] && RAMDISK=ramdisk.img || RAMDISK=${RAMDISK##/dev/}
 
+echo "cat proc cmdline"
+
 for c in `cat /proc/cmdline`; do
 	case $c in
 		iso-scan/filename=*)
+			echo "case: $c"
 			eval `echo $c | cut -b1-3,18-`
 			;;
 		*)
 			;;
 	esac
 done
+
+echo "finished with cat proc cmdline"
+echo "moving on to mounting tmpfs"
 
 mount -t tmpfs tmpfs /android
 cd /android
@@ -161,13 +171,19 @@ while :; do
 	echo -n .
 done
 
+echo "setting up sym links, part 1"
+
 ln -s mnt/$SRC /src
 ln -s android/system /
 ln -s ../system/lib/firmware ../system/lib/modules /lib
 
+echo "zcat install.img"
+
 if [ -n "$INSTALL" ]; then
 	zcat /src/install.img | ( cd /; cpio -iud > /dev/null )
 fi
+
+echo "starting some modprobe magik"
 
 if [ -x system/bin/ln -a \( -n "$DEBUG" -o -n "$BUSYBOX" \) ]; then
 	mv /bin /lib .
@@ -179,10 +195,13 @@ if [ -x system/bin/ln -a \( -n "$DEBUG" -o -n "$BUSYBOX" \) ]; then
 	hash -r
 fi
 
-# load scripts
+echo "loading some scripts"
+# load scripts 
 for s in `ls /scripts/* /src/scripts/*`; do
 	test -e "$s" && source $s
 done
+
+echo "make sure keyboard drivers are loaded" 
 
 # ensure keyboard driver is loaded
 [ -n "$INSTALL" -o -n "$DEBUG" ] && auto_detect & 
@@ -194,10 +213,14 @@ if [ 0$DEBUG -gt 0 ]; then
 	debug_shell debug-found
 fi
 
+echo "detect moar hardware"
+
 # A target should provide its detect_hardware function.
 # On success, return 0 with the following values set.
 # return 1 if it wants to use auto_detect
 [ "$AUTO" != "1" ] && detect_hardware && FOUND=1
+
+echo "starting install function"
 
 [ -n "$INSTALL" ] && do_install
 
@@ -207,6 +230,8 @@ mount_sdcard
 setup_tslib
 setup_dpi
 post_detect
+
+echo "finished loading mods"
 
 if [ 0$DEBUG -gt 1 ]; then
 	echo -e "\nUse Alt-F1/F2/F3 to switch between virtual consoles"
@@ -220,13 +245,19 @@ fi
 
 [ -n "$DEBUG" ] && SWITCH=${SWITCH:-chroot}
 
+echo "about to start android"
+
 # We must disable mdev before switching to Android
 # since it conflicts with Android's init
 echo > /proc/sys/kernel/hotplug
 
 export ANDROID_ROOT=/system
 
+echo "starting android"
+
 exec ${SWITCH:-switch_root} /android /init
+
+echo "you done messed up somewhere"
 
 # avoid kernel panic
 while :; do
