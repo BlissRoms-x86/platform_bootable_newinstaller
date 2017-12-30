@@ -132,6 +132,12 @@ format_fs()
 		ext4)
 			cmd="make_ext4fs -L"
 			;;
+		ext3)
+			cmd="mke2fs -jL"
+			;;
+		ext2)
+			cmd="mke2fs -L"
+			;;
 		ntfs)
 			cmd="mkntfs -fL"
 			;;
@@ -162,6 +168,13 @@ create_entry()
 	title=$1
 	shift
 	echo -e "title $title\n\tkernel /$asrc/kernel$vga $@ SRC=/$asrc\n\tinitrd /$asrc/initrd.img\n" >> $menulst
+}
+
+create_newest_entry()
+{
+	title=$1
+	shift
+	echo -e "title $title\n\tkernel /$newasrc/kernel$vga $@ SRC=/$newasrc\n\tinitrd /$newasrc/initrd.img\n" >> $menulst
 }
 
 create_menulst()
@@ -240,27 +253,82 @@ create_data_img()
 	fi
 }
 
+# try_upgrade()
+# {
+# 	[ -d $1 ] && return
+#	PREV_VERS="$PREV_VERS 8.1 8.0 7.1-rc2 7.1-rc1 6.0-r3 6.0-r2 6.0-r1 6.0-rc2 6.0-rc1 5.1-rc1 4.4-r5 4.4-r4 4.4-r3 4.4-r2 4.4-r1 4.4-RC2 4.4-RC1 4.4-test 4.3-test 4.2-test 4.0-r1 4.0-RC2 4.0-RC1"
+# 	for v in $PREV_VERS; do
+#		local prev
+#		if [ -d hd/$v ]; then
+#			prev=hd/$v
+#		elif [ -d hd/android-$v ]; then
+#			prev=hd/android-$v
+#		else
+#			continue
+#		fi
+#		dialog --title " Question " --yesno \
+#			"\nAn older version $v is detected.\nWould you like to upgrade it?" 8 51
+#		if [ $? -eq 0 ]; then
+#			mv $prev $1
+#			rm -rf $1/data/dalvik-cache/* $1/data/system/wpa_supplicant
+#			sed -i 's/\(ctrl_interface=\)\(.*\)/\1wlan0/' $1/data/misc/wifi/wpa_supplicant.conf
+#			break
+#	done
+# }
+
 try_upgrade()
 {
-	[ -d $1 ] && return
-	PREV_VERS="$PREV_VERS 7.1-rc2 7.1-rc1 6.0-r3 6.0-r2 6.0-r1 6.0-rc2 6.0-rc1 5.1-rc1 4.4-r5 4.4-r4 4.4-r3 4.4-r2 4.4-r1 4.4-RC2 4.4-RC1 4.4-test 4.3-test 4.2-test 4.0-r1 4.0-RC2 4.0-RC1"
+	echo try_upgrade ...
+	
+	PREV_VERS="2016-* 2017-* 2018-*"
 	for v in $PREV_VERS; do
-		local prev
-		if [ -d hd/$v ]; then
-			prev=hd/$v
-		elif [ -d hd/android-$v ]; then
-			prev=hd/android-$v
-		else
-			continue
-		fi
-		dialog --title " Question " --yesno \
-			"\nAn older version $v is detected.\nWould you like to upgrade it?" 8 51
-		if [ $? -eq 0 ]; then
-			mv $prev $1
-			rm -rf $1/data/dalvik-cache/* $1/data/system/wpa_supplicant
-			sed -i 's/\(ctrl_interface=\)\(.*\)/\1wlan0/' $1/data/misc/wifi/wpa_supplicant.conf
-			break
-		fi
+		PREV_OSES=hd/android-$v
+		echo "DIRS " $PREV_OSES
+		for prev_os in $PREV_OSES; do
+		    if [ -d $prev_os ]; then
+		        echo "Find os" $prev_os
+			    dialog --title " Question " --yesno \
+				    "\nAn older Bliss-x86 version $prev_os is detected. Would you like to upgrade it?" 8 55
+			    if [ $? -eq 0 ]; then
+			        if [ $prev_os != $1 ]; then
+			            if [ -d $1 ]; then
+			                echo $prev_os "!=" $1 ", and" $1 "DIR existed"
+				            dialog --title "NOTICE" --yesno \
+							    	"\n $1 existed. Do you want to break upgrade?." 10 61
+					        if [ $? -eq 0 ]; then
+					            continue
+					        else
+					             dialog --title "NOTICE" --yesno \
+							    	  "\n Do you want to remove $1 and upgrade $prev_os?." 10 61
+							     if [ $? -eq 0 ]; then
+					                  rm -rf $1
+				    	              mv $prev_os $1
+				    	              rm -rf $1/data/dalvik-cache/* $1/data/system/wpa_supplicant
+				    	              sed -i 's/\(ctrl_interface=\)\(.*\)/\1wlan0/' $1/data/misc/wifi/wpa_supplicant.conf
+				    	              break 2		    					                  
+					             else
+					                  continue
+					             fi
+					        fi     					                  
+					    else
+					        echo $prev_os "!=" $1 "and no" $1 "DIR"
+				    	    mv $prev_os $1
+				    	    rm -rf $1/data/dalvik-cache/* $1/data/system/wpa_supplicant
+				    	    sed -i 's/\(ctrl_interface=\)\(.*\)/\1wlan0/' $1/data/misc/wifi/wpa_supplicant.conf
+				    	    break 2		    
+					    fi					    
+				    else
+				        echo $prev_os "==" $1 " But still upgrade!"
+				    	#mv $prev_os $1
+				    	rm -rf $1/data/dalvik-cache/* $1/data/system/wpa_supplicant
+				    	sed -i 's/\(ctrl_interface=\)\(.*\)/\1wlan0/' $1/data/misc/wifi/wpa_supplicant.conf
+				    	break 2
+					fi
+			    fi
+	        else
+	            echo "Did not find" $prev_os
+		    fi
+		 done
 	done
 }
 
@@ -280,6 +348,8 @@ get_part_info()
 
 install_to()
 {
+	echo install_to ...
+	
 	cd /
 	mountpoint -q /hd && umount /hd
 	while [ 1 ]; do
@@ -321,15 +391,33 @@ install_to()
 		mountpoint -q /hd && umount /hd
 		while [ 1 ]; do
 			try_mount rw /dev/$boot /hd && break
-			dialog --title " Confirm " --defaultno --yesno "\n Cannot mount /dev/$boot.\n Do you want to format it?" 8 37
+			dialog --title " Confirm " --defaultno --yesno "\n Cannot mount /dev/$boot.\n Do you want to format it? THIS WILL REMOVE ANY WINDOWS ENTRIES TOO" 8 37
 			[ $? -eq 0 ] && mkdosfs -n EFI /dev/$boot
 		done
 		cp -af /grub2/efi /hd
 		mkdir -p /hd/boot/grub
 		grubcfg=/hd/boot/grub/grub.cfg
 		echo -e "set timeout=5\n\n" > $grubcfg
-		echo -e "menuentry \"Android-x86 $VER\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinux /$asrc/kernel quiet $cmdline \n\tinitrd /$asrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 $VER\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinux /$asrc/kernel quiet AUTO_LOAD=old $cmdline \n\tinitrd /$asrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 $VER (old modprobe)\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinux /$asrc/kernel quiet $cmdline \n\tinitrd /$asrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 $VER (No SetupWizard)\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinux /$asrc/kernel quiet SETUPWIZARD=0 $cmdline \n\tinitrd /$asrc/initrd.img\n}" >> $grubcfg
 		echo -e "menuentry \"Android-x86 $VER (DEBUG mode)\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinux /$asrc/kernel $cmdline DEBUG=2\n\tinitrd /$asrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 $VER (DEBUG mode no hwaccel)\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinux /$asrc/kernel $cmdline DEBUG=2 HWACCEL=0 \n\tinitrd /$asrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 $VER (DEBUG nomodeset)\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinux /$asrc/kernel nomodeset DEBUG=2 $cmdline \n\tinitrd /$asrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 $VER (Debug video=LVDS-1:d)\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinux /$asrc/kernel video=LVDS-1:d DEBUG=2 $cmdline \n\tinitrd /$asrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 $VER (Force Intel Graphics i915/i965)\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinux /$asrc/kernel i915.modeset=0 DEBUG=2 $cmdline \n\tinitrd /$asrc/initrd.img\n}" >> $grubcfg
+		
+		#add newest updated Bliss-x86 entry
+		echo -e "menuentry \"Android-x86 Newest\" {\n\tsearch --set=root --file /$newasrc/kernel\n\tlinux /$newasrc/kernel quiet $cmdline \n\tinitrd /$newasrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 Newest Newest (DEBUG mode)\" {\n\tsearch --set=root --file /$newasrc/kernel\n\tlinux /$newasrc/kernel quiet $cmdline DEBUG=2\n\tinitrd /$newasrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 Newest $VER (old modprobe)\" {\n\tsearch --set=root --file /$newasrc/kernel\n\tlinux /$newasrc/kernel quiet $cmdline \n\tinitrd /$newasrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 Newest $VER (No SetupWizard)\" {\n\tsearch --set=root --file /$newasrc/kernel\n\tlinux /$newasrc/kernel quiet SETUPWIZARD=0 $cmdline \n\tinitrd /$newasrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 Newest $VER (DEBUG mode)\" {\n\tsearch --set=root --file /$newasrc/kernel\n\tlinux /$newasrc/kernel $cmdline DEBUG=2\n\tinitrd /$newasrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 Newest $VER (DEBUG mode no hwaccel)\" {\n\tsearch --set=root --file /$newasrc/kernel\n\tlinux /$newasrc/kernel $cmdline DEBUG=2 HWACCEL=0 \n\tinitrd /$newasrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 Newest $VER (DEBUG nomodeset)\" {\n\tsearch --set=root --file /$newasrc/kernel\n\tlinux /$newasrc/kernel nomodeset DEBUG=2 $cmdline \n\tinitrd /$newasrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 Newest $VER (Debug video=LVDS-1:d)\" {\n\tsearch --set=root --file /$newasrc/kernel\n\tlinux /$newasrc/kernel video=LVDS-1:d DEBUG=2 $cmdline \n\tinitrd /$newasrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 Newest $VER (Force Intel Graphics i915/i965)\" {\n\tsearch --set=root --file /$newasrc/kernel\n\tlinux /$newasrc/kernel i915.modeset=0 DEBUG=2 $cmdline \n\tinitrd /$newasrc/initrd.img\n}" >> $grubcfg
+		
 		if [ -e /hd/EFI/Microsoft/Boot/bootmgfw.efi ]; then
 			echo -e "menuentry \"Windows (UEFI)\" {\n\tsearch --set=root --file /EFI/Microsoft/Boot/bootmgfw.efi\n\tchainloader /EFI/Microsoft/Boot/bootmgfw.efi\n}" >> $grubcfg
 		fi
