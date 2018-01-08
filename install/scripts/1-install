@@ -90,7 +90,10 @@ select_dev()
 
 	lsblk=`ls /sys/block | grep -v -E "loop|ram|sr|boot|rpmb"`
 	for d in $lsblk; do
-		for i in /sys/block/$d/$d*; do
+		p=0 
+		for i in /sys/block/$d/$d* /sys/block/$d; do 
+			[ -e $i/partition ] && p=1 
+			[ $p -eq 1 -a "$i" = "/sys/block/$d" ] && break 
 			echo $i | grep -q -E "boot|rpmb" && continue
 			[ -d $i ] && ( grep "`basename $i:`" $tempfile || echo "`basename $i` unknown" )
 		done
